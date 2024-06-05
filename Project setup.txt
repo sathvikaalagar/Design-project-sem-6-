@@ -1,0 +1,29 @@
+HOW TO RUN THE CODE :
+
+1. Setup Environment:
+	Install necessary libraries (Flask, SpeechRecognition, pyttsx3, pyautogui, TensorFlow, etc.).
+2. Prepare Data:
+	Download and organize image and caption data.
+	Extract image features using VGG16 and save to a file.
+3. Load Data:
+	Load image features and captions into the program.
+	Clean Captions:
+4. Preprocess captions (lowercase, remove non-alphabetic characters, add start/end tokens).
+5. Create Vocabulary:
+	Tokenize captions and create word-index mappings.
+6. Train Image Captioning Model:
+	Define and train the model using image features and caption sequences.
+7. Save Model:
+	Save the trained model's architecture and weights.
+8. Initialize Flask App:
+	Create and configure the Flask application.
+9. Define Functions:
+	speak: Converts text to speech.
+	listen_for_voice_command: Listens for voice commands.
+	take_screenshot_and_generate_caption: Captures a screenshot, generates a caption, and speaks it.
+11. Start Flask App:
+	Start the Flask application and the voice command listener in a separate thread.
+12. Activate Listening:
+	Use the /activate route to start listening for voice commands.
+
+This overview outlines the main steps to prepare, run, and interact with the program.

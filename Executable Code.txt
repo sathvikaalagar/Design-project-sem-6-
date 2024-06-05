@@ -1,0 +1,326 @@
+from flask import Flask, jsonify
+import speech_recognition as sr
+from pyautogui import screenshot
+import os
+import threading
+import pyttsx3
+import pickle
+import numpy as np
+from tqdm import tqdm
+from keras.applications.vgg16 import VGG16, preprocess_input
+from keras.preprocessing.image import load_img, img_to_array
+from nltk.tokenize import word_tokenize
+from keras.preprocessing.sequence import pad_sequences
+from keras.models import Model
+import tensorflow as tf
+app = Flask(_name_)
+# Variable to track whether the app should listen for voice commands
+listening_for_command = False
+# Initialize text-to-speech engine
+engine = pyttsx3.init()
+def speak(text):
+engine.say(text)
+engine.runAndWait()
+def listen_for_voice_command():
+global listening_for_command
+recognizer = sr.Recognizer()
+recognizer.energy_threshold = 4000 # Adjust this threshold based on your environment
+print("Available Microphones:")
+for index, name in enumerate(sr.Microphone.list_microphone_names()):
+print(f"{index}: {name}")
+# Set the microphone index to the desired microphone
+microphone_index = 2 # Replace with the index corresponding to your desired
+microphone
+while True:
+if listening_for_command:
+try:
+28
+with sr.Microphone(device_index=microphone_index) as source:
+print("Say something:")
+audio = recognizer.listen(source, timeout=5) # Adjust the timeout as needed
+text = recognizer.recognize_google(audio).lower()
+print(f"Recognized: {text}")
+# Check if the recognized text contains the trigger phraseif
+'buddy' in text:
+print("Voice command recognized: 'Hey buddy'")
+speak("Yes") # Provide audio feedback
+take_screenshot_and_generate_caption()
+except sr.UnknownValueError:
+print("Speech recognition could not understand audio")
+except sr.RequestError as e:
+print(f"Error connecting to Google API: {e}")
+except Exception as e:
+print(f"Error: {e}")
+# New route to activate the app
+@app.route('/activate', methods=['POST'])
+def activate_app():
+global listening_for_command
+listening_for_command = True
+return jsonify({'status': 'success', 'message': 'App activated.'})
+def take_screenshot_and_generate_caption():
+global listening_for_command
+listening_for_command = False # Disable listening temporarily while taking ascreenshot
+image_path = os.path.abspath('images/screenshot.png')
+screenshot(image_path)
+print(f"Screenshot captured successfully. Image saved to {image_path}")#
+Load and preprocess image
+vgg_model = VGG16()
+vgg_model = Model(inputs=vgg_model.inputs, outputs=vgg_model.layers[-2].output)
+image = load_img(image_path, target_size=(224, 224))
+image = img_to_array(image)
+image = image.reshape((1, image.shape[0], image.shape[1], image.shape[2]))
+image = preprocess_input(image)
+feature = vgg_model.predict(image, verbose=0)
+# Predict caption
+caption = predict_caption(loaded_model, feature, word_index, max_length, index_word)
+print("Predicted Caption:", caption)
+29
+# Save caption to a notepad file
+with open('caption.txt', 'w') as f:
+f.write(caption)
+# Convert caption to audio
+speak(caption)
+listening_for_command = True # Resume listening for voice commands#
+Load features and captions
+BASE_DIR = "C:\\Users\\Thejeal Sri\\Desktop\\flickr8k"
+WORKING_DIR = "C:\\Users\\Thejeal Sri\\Desktop\\working"
+with open(os.path.join(WORKING_DIR, 'features.pkl'), 'rb') as f:
+features = pickle.load(f)
+with open(os.path.join(BASE_DIR, 'captions.txt'), 'r') as f:next(f)
+captions_doc = f.read()
+# Process lines
+mapping = {}
+for line in tqdm(captions_doc.split('\n')):
+tokens = line.split(',')
+if len(line) < 2:
+continue
+image_id, caption = tokens[0], tokens[1:]
+image_id = image_id.split('.')[0]
+caption = " ".join(caption) if
+image_id not in mapping:
+mapping[image_id] = []
+mapping[image_id].append(caption)
+# Clean captions
+def clean(mapping):
+for key, captions in mapping.items():
+for i in range(len(captions)):
+caption = captions[i].lower()
+caption = caption.replace('[^A-Za-z]', '')
+caption = caption.replace('\s+', ' ')
+caption = 'startseq ' + " ".join([word for word in caption.split() if len(word) > 1]) + '
+endseq'
+captions[i] = caption
+clean(mapping)
+# Create a vocabulary
+30
+all_captions = []
+for key in mapping:
+for caption in mapping[key]:
+all_captions.append(caption)
+# Tokenize captions
+vocabulary = set()
+for caption in all_captions:
+vocabulary.update(word_tokenize(caption))
+# Create word-to-index and index-to-word mappings
+word_index = {word: idx + 1 for idx, word in enumerate(sorted(vocabulary))}
+index_word = {idx: word for word, idx in word_index.items()}
+vocab_size = len(word_index) + 1
+# Convert captions to sequences of integers
+def captions_to_sequences(mapping, word_index):
+sequences = {}
+for key, captions in mapping.items():
+sequences[key] = []
+for caption in captions:
+seq = [word_index[word] for word in word_tokenize(caption) if word in
+word_index]
+sequences[key].append(seq)
+return sequences
+sequences = captions_to_sequences(mapping, word_index)
+max_length = max(len(seq) for seqs in sequences.values() for seq in seqs)
+# Load model architecture from JSON
+model_architecture_path = r"C:\Users\Thejeal Sri\Desktop\mod\model_architecture.json"
+with open(model_architecture_path, 'r') as f:
+model_json = f.read()
+loaded_model = tf.keras.models.model_from_json(model_json)
+# Load model weights
+model_weights_path = r"C:\Users\\Thejeal Sri\\Desktop\\mod\\model_weights.h5"
+loaded_model.load_weights(model_weights_path)
+def predict_caption(loaded_model, image, word_index, max_length, index_word):
+in_text = 'startseq'
+for i in range(max_length):
+sequence = [word_index.get(word, 0) for word in word_tokenize(in_text)]sequence
+= pad_sequences([sequence], maxlen=max_length)
+yhat = loaded_model.predict([image, sequence], verbose=0)
+yhat = np.argmax(yhat)
+word = index_word.get(yhat)
+if word is None or word == 'endseq':
+31
+break
+in_text += ' ' + word
+return in_text.strip('startseq ').strip(' endseq')
+if _name_ == '_main_':
+os.makedirs('images', exist_ok=True)
+# Start a separate thread for continuous voice command listening
+voice_command_thread = threading.Thread(target=listen_for_voice_command)
+voice_command_thread.start()
+app.run(debug=True)
+#Image captioning model
+import os
+import pickle
+import numpy as np
+from tqdm.notebook import tqdm
+import tensorflow
+from tensorflow.keras.applications.vgg16 import VGG16, preprocess_input
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.models import Model
+from tensorflow.keras.utils import to_categorical, plot_model
+from tensorflow.keras.layers import Input, Dense, LSTM, Embedding, Dropout, add
+from tensorflow.keras.preprocessing.text import Tokenizer
+BASE_DIR = "C:\\Users\\Thejeal Sri\\Desktop\\flickr8k"
+WORKING_DIR = "C:\\Users\\Thejeal Sri\\Desktop\\working"
+features = {}
+# extract features from image
+directory = os.path.join(BASE_DIR, 'Images')
+for img_name in tqdm(os.listdir(directory)):
+# load the image from file
+img_path = directory + '/' + img_name
+image = load_img(img_path, target_size=(224, 224))
+# convert image pixels to numpy array
+image = img_to_array(image)
+# reshape data for model
+image = image.reshape((1, image.shape[0], image.shape[1], image.shape[2]))
+# preprocess image for vgg
+image = preprocess_input(image)
+# extract features
+feature = model.predict(image, verbose=0)
+# get image ID
+image_id = img_name.split('.')[0]
+# store feature
+features[image_id] = feature
+32
+pickle.dump(features, open(os.path.join(WORKING_DIR, 'features.pkl'), 'wb'))
+with open(os.path.join(WORKING_DIR, 'features.pkl'), 'rb') as f:
+features = pickle.load(f)
+with open(os.path.join(BASE_DIR, 'captions.txt'), 'r') as f:next(f)
+captions_doc = f.read()
+mapping = {}
+# process lines
+for line in tqdm(captions_doc.split('\n')):
+# split the line by comma(,)
+tokens = line.split(',')
+if len(line) < 2:
+continue
+image_id, caption = tokens[0], tokens[1:]
+# remove extension from image ID
+image_id = image_id.split('.')[0]
+# convert caption list to string
+caption = " ".join(caption)
+# create list if needed
+if image_id not in mapping:
+mapping[image_id] = []
+# store the caption
+mapping[image_id].append(caption)
+len(mapping)
+def clean(mapping):
+for key, captions in mapping.items():
+for i in range(len(captions)):
+# take one caption at a time
+caption = captions[i]
+# preprocessing steps
+# convert to lowercase
+caption = caption.lower()
+# delete digits, special chars, etc.,
+caption = caption.replace('[^A-Za-z]', '')
+# delete additional spaces
+caption = caption.replace('\s+', ' ')
+# add start and end tags to the caption
+caption = 'startseq ' + " ".join([word for word in caption.split() if len(word)>1]) + '
+endseq'
+captions[i] = caption
+all_captions = []
+for key in mapping:
+for caption in mapping[key]:
+all_captions.append(caption)
+# tokenize the text
+tokenizer = Tokenizer()
+tokenizer.fit_on_texts(all_captions)
+vocab_size = len(tokenizer.word_index) + 1
+33
+image_ids = list(mapping.keys())
+split = int(len(image_ids) * 0.90)
+train = image_ids[:split]
+test = image_ids[split:]
+def data_generator(data_keys, mapping, features, tokenizer, max_length, vocab_size,
+batch_size):
+# loop over images
+X1, X2, y = list(), list(), list()
+n = 0
+while 1:
+for key in data_keys:
+n += 1
+captions = mapping[key]
+# process each caption
+for caption in captions:
+# encode the sequence
+seq = tokenizer.texts_to_sequences([caption])[0]
+# split the sequence into X, y pairs
+for i in range(1, len(seq)):
+# split into input and output pairs
+in_seq, out_seq = seq[:i], seq[i] #
+pad input sequence
+in_seq = pad_sequences([in_seq], maxlen=max_length)[0]
+# encode output sequence
+out_seq = to_categorical([out_seq], num_classes=vocab_size)[0]
+# store the sequences
+X1.append(features[key][0])
+X2.append(in_seq)
+y.append(out_seq)
+if n == batch_size:
+X1, X2, y = np.array(X1), np.array(X2), np.array(y)
+yield {"image": X1, "text": X2}, y
+X1, X2, y = list(), list(), list()
+n = 0
+inputs1 = Input(shape=(4096,), name="image")
+fe1 = Dropout(0.4)(inputs1)
+fe2 = Dense(256, activation='relu')(fe1)
+# sequence feature layers
+inputs2 = Input(shape=(max_length,), name="text")
+se1 = Embedding(vocab_size, 256, mask_zero=True)(inputs2)se2
+= Dropout(0.4)(se1)
+se3 = LSTM(256)(se2)
+# decoder model
+decoder1 = add([fe2, se3])
+decoder2 = Dense(256, activation='relu')(decoder1)
+outputs = Dense(vocab_size, activation='softmax')(decoder2)
+34
+model = Model(inputs=[inputs1, inputs2], outputs=outputs)
+model.compile(loss='categorical_crossentropy', optimizer='adam')
+epochs = 5
+batch_size = 32
+steps = len(train) // batch_size
+for i in range(epochs):
+# create data generator
+generator = data_generator(train, mapping, features, tokenizer, max_length, vocab_size,
+batch_size)
+# fit for one epoch
+model.fit(generator, epochs=1, steps_per_epoch=steps, verbose=1)
+epochs = 5
+batch_size = 32
+steps = len(train) // batch_size
+for i in range(epochs):
+# create data generator
+generator = data_generator(train, mapping, features, tokenizer, max_length, vocab_size,
+batch_size)
+# fit for one epoch
+model.fit(generator, epochs=1, steps_per_epoch=steps, verbose=1)
+import pickle
+import pickle
+# Save model architecture as JSON
+model_architecture_path = r"C:\Users\Thejeal Sri\Desktop\mod\model_architecture.json"
+with open(model_architecture_path, 'w') as f:
+f.write(model.to_json())
+#Save model weights
+model_weights_path = r"C:\Users\Thejeal Sri\Desktop\mod\model_weights.pkl"
+with open(model_weights_path, 'wb') as f:
+pickle.dump(model.get_weights(), f

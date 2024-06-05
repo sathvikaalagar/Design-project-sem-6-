@@ -1,0 +1,25 @@
+WORKING PRINCIPLE OF THE PROJECT:
+
+1. Voice Command Activation:
+	The application listens for a specific voice command (e.g., "Hey buddy") to activate its functions.
+2. Screenshot Capture:
+	Upon recognizing the voice command, the application captures a screenshot of the current screen.
+3. Feature Extraction:
+	The captured screenshot is processed using the VGG16 model to extract image features.
+4. Caption Generation:
+	The extracted image features are fed into a pre-trained image captioning model.
+	The model generates a descriptive caption for the screenshot.
+5. Text-to-Speech Conversion:
+	The generated caption is converted to speech using a text-to-speech engine, providing audio feedback to the user.
+6. Saving Captions:
+	The generated caption is also saved to a text file for reference.
+7. Continuous Listening:
+	The application resumes listening for voice commands, ready to repeat the process.
+
+These points summarize the core functionalities and workflow of the project.
+
+
+
+
+
+
